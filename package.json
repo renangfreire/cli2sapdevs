@@ -1,0 +1,22 @@
+{
+  "name": "cli2sapdevs",
+  "version": "1.0.0",
+  "bin": {
+    "cli2sapdevs": "./dist/index.js"
+  },
+  "scripts": {
+    "start:dev": "tsx ./src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "tsx": "^4.18.0",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^5.3.8",
+    "inquirer": "^10.1.8"
+  }
+}

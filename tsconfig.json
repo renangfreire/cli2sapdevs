@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+      "module": "esnext",
+      "rootDir": "src",
+      "outDir": "dist",
+      "target": "ES2023",
+      "lib": ["ES2023"],
+      "sourceMap": true,
+      "allowJs": true,
+      "esModuleInterop": true,
+      "moduleResolution": "node",
+      "forceConsistentCasingInFileNames": true,
+      "noImplicitReturns": true,
+      "noImplicitThis": true,
+      "noImplicitAny": true,
+      "strictNullChecks": true,
+      "suppressImplicitAnyIndexErrors": true,
+      "noUnusedLocals": true,
+      "ignoreDeprecations": "5.0"
+    },
+    "exclude": [
+      "node_modules",
+      "dist",
+      "templates"
+    ]
+  }
+  
