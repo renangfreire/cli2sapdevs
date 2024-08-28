@@ -5,6 +5,8 @@ import * as fs from "fs/promises";
 
 import { generateTemplate } from "./utils/generate-template";
 import { generateMicroComponent } from "./utils/generate-micro_component";
+import { ExitProcessError } from "./utils/finishProcess";
+import { adaptQuestion } from "./adapters/adaptInquirerPrompt";
 
 // Get Possible Generator Choices
 async function getGeneratorChoices() {
@@ -27,28 +29,38 @@ async function getGeneratorFiles(generatorType: string) {
   });
 }
 
-// Making Generator Type QUESTION 
-const generatorTypeResponse = await prompt.select({
+// Making Generator Type QUESTION #
+const generatorTypeResponse = await adaptQuestion(prompt.select({
           message: "Choose a generator type",
           choices: await getGeneratorChoices()
-    })
+    }))
+
+// Verifing Error in Prompt
+if(generatorTypeResponse.data === undefined) process.exit()
+if(generatorTypeResponse.status === "exit") process.exit()
+if(generatorTypeResponse.status === "error") ExitProcessError(generatorTypeResponse.error)
 
 // Making Generator File QUESTION
-const removingPluralInType = generatorTypeResponse.substring(0, generatorTypeResponse.length - 1)
-const generatorFilePathResponse = await prompt.select({
+const removingPluralInType = generatorTypeResponse.data?.substring(0, generatorTypeResponse.data.length - 1)
+const generatorFilePathResponse = await adaptQuestion(prompt.select({
   message: `Choose a ${removingPluralInType} type`,
-  choices: await getGeneratorFiles(generatorTypeResponse)
-})
+  choices: await getGeneratorFiles(generatorTypeResponse.data || "")
+}))
+
+// Verifing Error in Prompt
+if(generatorFilePathResponse.status === "exit") process.exit()
+if(generatorFilePathResponse.status === "error") ExitProcessError(generatorFilePathResponse.error)
+if(generatorFilePathResponse.data === undefined) process.exit()
 
 // Switching between the generator types
 // Micro-component -> Create a new micro-component in project already created 
 // Template -> Generate a new project from template
-switch(generatorTypeResponse){
+switch(generatorTypeResponse.data){
   case "template":
-    generateTemplate(generatorFilePathResponse)
+    generateTemplate(generatorFilePathResponse.data)
     break;
   default:
-    generateMicroComponent(generatorTypeResponse, generatorFilePathResponse)
+    generateMicroComponent(generatorTypeResponse.data, generatorFilePathResponse.data)
 }
 
 // Making Questions
