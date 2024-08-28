@@ -5,13 +5,18 @@
     "cli2sapdevs": "./dist/index.js"
   },
   "scripts": {
-    "start:dev": "tsx ./src/index.ts"
+    "start:dev": "tsx ./src/index.ts",
+    "build": "tsup ./src/index.ts --format esm && shx rm -rf dist/generators && shx cp -r generators dist",
+    "build:link": "npm unlink cli2sapdevs && npm run build && npm link"
   },
+  "type": "module",
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^22.5.0",
+    "shx": "^0.3.4",
+    "tsup": "^8.2.4",
     "tsx": "^4.18.0",
     "typescript": "^5.5.4"
   },
