@@ -14,6 +14,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/ejs": "^3.1.5",
     "@types/node": "^22.5.0",
     "shx": "^0.3.4",
     "tsup": "^8.2.4",
@@ -22,6 +23,7 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^5.3.8",
+    "ejs": "^3.1.10",
     "inquirer": "^10.1.8"
   }
 }
