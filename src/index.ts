@@ -41,9 +41,8 @@ if(generatorTypeResponse.status === "exit") process.exit()
 if(generatorTypeResponse.status === "error") ExitProcessError(generatorTypeResponse.error)
 
 // Making Generator File QUESTION
-const removingPluralInType = generatorTypeResponse.data?.substring(0, generatorTypeResponse.data.length - 1)
 const generatorFilePathResponse = await adaptQuestion(prompt.select({
-  message: `Choose a ${removingPluralInType} type`,
+  message: `Choose a ${generatorTypeResponse.data} type`,
   choices: await getGeneratorFiles(generatorTypeResponse.data || "")
 }))
 
@@ -55,12 +54,19 @@ if(generatorFilePathResponse.data === undefined) process.exit()
 // Switching between the generator types
 // Micro-component -> Create a new micro-component in project already created 
 // Template -> Generate a new project from template
+
+const generatorData = {
+  templatePath: new URL(`../generators/${generatorTypeResponse.data}/${generatorFilePathResponse.data}`, import.meta.url).pathname.substring(1),
+  generatorType: generatorTypeResponse.data,
+  filePath: generatorFilePathResponse.data
+}
+
 switch(generatorTypeResponse.data){
   case "template":
-    generateTemplate(generatorFilePathResponse.data)
+    generateTemplate(generatorData)
     break;
   default:
-    generateMicroComponent(generatorTypeResponse.data, generatorFilePathResponse.data)
+    generateMicroComponent(generatorData)
 }
 
 // Making Questions
