@@ -1,3 +1,4 @@
+
 sap.ui.define([
     "sap/ui/model/odata/v2/ODataModel"
 ], function (ODataModel) {
@@ -10,23 +11,19 @@ sap.ui.define([
 
         init: function(oComponent) {
             this._oComponent = oComponent;
-        
-            <% if(existingConnections) { %>
-                <% existingConnections.forEach(connection => { %>
 
-                const <%=connection.oModelName%>Model = new ODataModel("<%= connection.gatewayPath %>", {
+            <% if(existingConnections.length > 0) { %>
+                <% existingConnections.forEach(connection => { %>
+                const <%=connection.connectionName.toLowerCase().replace(/_(\w)/g, (_, letter) => letter.toUpperCase()).replace(/^./, str => str.toUpperCase())%>Model = new ODataModel("<%= connection.connectionUri %>", {
                     defaultUpdateMethod: "PUT" // Change to PATCH if necessary
                 });
-                this.setODataModel(oDataModel, "<%= connection.oModelName%>");
+                this.setODataModel(<%=connection.connectionName.toLowerCase().replace(/_(\w)/g, (_, letter) => letter.toUpperCase()).replace(/^./, str => str.toUpperCase())%>Model, "<%= connection.connectionName%>");
             <% }) %>
-
             <% } else { %>
                 const oDataModel = new ODataModel("/example-gateway-path", {
                     defaultUpdateMethod: "PUT" // Change to PATCH if necessary
                 });
-
-            this.setODataModel(oDataModel, "<oDataModelName>"); //Datasource is default
-            
+            this.setODataModel(oDataModel, "<connectionName>Model"); //Datasource is default
             <% } %>
         },
 

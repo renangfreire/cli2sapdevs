@@ -6,7 +6,6 @@ import * as prompt from "@inquirer/prompts"
 import { generatorProps } from "../@types/generator";
 import { renderEjs } from "./renderEjs";
 import { PossiblePromptTypes, QuestionContent, QuestionSchema } from "../@types/questions";
-import { ExitProcessError } from "./finishProcess";
 
 type responsesSchema = {
     [key: string]: any
@@ -78,7 +77,7 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
     const responses = await makeQuestions(generatorType, filePath)
 
     if(responses.wantConnections){
-        responses.existingConnections = getCreatedConnectionsInManifest(webAppPath)
+        responses.existingConnections = await getCreatedConnectionsInManifest(webAppPath)
     }
 
     const createdFileFolder = await createFolder(generatorType, webAppPath)
@@ -88,16 +87,30 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
 
 async function getCreatedConnectionsInManifest(webAppPath: string){
     const manifestPath = path.join(webAppPath, "manifest.json")
+    const existingConnections: Array<{connectionName: string, connectionUri: string}>  = []
 
         // verifying existence of the requested file 
         if(fs.existsSync(manifestPath)){
             const manifestBuffer = await fsPromises.readFile(manifestPath)
             const manifestFile = JSON.parse(manifestBuffer.toString())
 
-            if(!manifestFile.dataSources) return console.log("Nenhuma conexão foi detectada")
+            if(!manifestFile["sap.app"].dataSources) return console.log("Nenhuma conexão foi detectada")
 
-            console.log(manifestFile)
+            Object.entries(manifestFile["sap.app"].dataSources).forEach(([connectionName, connectionContent]: [string, any]) => {
+                if(!connectionContent?.uri && !connectionContent?.type) return
+
+                if(connectionContent?.type.toLowerCase() !== "odata") return
+
+                const connection = {
+                    connectionName,
+                    connectionUri: connectionContent.uri
+                }
+
+                existingConnections.push(connection)
+            })
         }
+
+        return existingConnections
 }
 
 // ---------------------
@@ -140,9 +153,11 @@ async function makeQuestions(generatorType: string, filePath: string){
           if(question === undefined) throw new Error("Error in Question Structure")
 
           if(!promptType) throw new Error("Necessary prompt type in Question Schema")
-            const handler = prompt[promptType] as (question: QuestionContent<typeof promptType>) => Promise<any>
         
-        if(!handler) throw new Error("Prompt type not found")
+          const handler = prompt[promptType] as (question: QuestionContent<typeof promptType>) => Promise<any>
+        
+          if(!handler) throw new Error("Prompt type not found")
+            
           const questionResponse = await handler(question)
   
           responses[question.name] = questionResponse
