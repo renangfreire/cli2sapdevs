@@ -6,6 +6,7 @@ import * as prompt from "@inquirer/prompts"
 import { generatorProps } from "../@types/generator";
 import { renderEjs } from "./renderEjs";
 import { PossiblePromptTypes, QuestionContent, QuestionSchema } from "../@types/questions";
+import { adaptManifest, manifestSchema } from "../adapters/adaptManifest";
 
 type responsesSchema = {
     [key: string]: any
@@ -45,89 +46,94 @@ async function createFolder (generatorType: string, webAppPath: string){
     return fileFolder
 }
 
-async function createFile(templatePath: string, createdFileFolder: string, responses: responsesSchema, filePath: string){
+async function createFile(templatePath: string, createdFileFolder: string, responses: responsesSchema, filePath: string): Promise<[{filename: string}[], boolean]>{
     const filesToCreate = await fsPromises.readdir(templatePath)
+    const createdFiles: {filename: string}[] = []
+
+    await Promise.all(
+        filesToCreate.map(async (file) => {
+            const orgFile = path.join(templatePath, file)
     
-    filesToCreate.forEach(async (file) => {
-        const orgFile = path.join(templatePath, file)
-
-        const stats = await fsPromises.stat(orgFile)
-
-        if(stats.isFile()){
-            // verifying existence of the requested file 
-            if(fs.existsSync(path.join(createdFileFolder, file))) {
-                // Change FileName to FilePath => generator/* <folder name is filePath>
-                const fileExtension = file.split(".").at(-1)
-                file = `${filePath}.${fileExtension}` 
-
-                // if folder continue exists
-                if(fs.existsSync(path.join(createdFileFolder, file))){
-                    const overwriteResponse = await prompt.confirm({
-                        message: "Parece que o arquivo que deseja gerar, já existe. Deseja sobrescrevê-lo?"
-                    })
-
-                    if(!overwriteResponse) return process.exit()
+            const stats = fs.statSync(orgFile)
+    
+            if(stats.isFile()){
+                // verifying existence of the requested file 
+                if(fs.existsSync(path.join(createdFileFolder, file))) {
+                    // Change FileName to FilePath => generator/* <folder name is filePath>
+                    const fileExtension = file.split(".").at(-1)
+                    file = `${filePath}.${fileExtension}` 
+    
+                    // if folder continue exists
+                    if(fs.existsSync(path.join(createdFileFolder, file))){
+                        const overwriteResponse = await prompt.confirm({
+                            message: "Parece que o arquivo que deseja gerar, já existe. Deseja sobrescrevê-lo?"
+                        })
+    
+                        if(!overwriteResponse) return
+                    }
                 }
+    
+                const template = await fsPromises.readFile(orgFile, 'utf-8')
+                const templateEjs = renderEjs(template, responses)
+                
+                fsPromises.writeFile(path.join(createdFileFolder, file), templateEjs)
+    
+                createdFiles.push({filename: file})
             }
+        })
+    )
 
-            const template = await fsPromises.readFile(orgFile, 'utf-8')
-            const templateEjs = renderEjs(template, responses)
-            
-            fsPromises.writeFile(path.join(createdFileFolder, file), templateEjs)
-        }
-    })
+    return [createdFiles, false]
 }
 
+// Main func
 export async function generateMicroComponent({templatePath, generatorType, filePath}: generatorProps) {
     const webAppPath = await fetchWebappFolder()
 
     const responses = await makeQuestions(generatorType, filePath)
 
+    const manifestFile = await adaptManifest(webAppPath)
+
     if(responses.wantConnections){
-        responses.existingConnections = await getCreatedODataConnections(webAppPath)
+        if(manifestFile.dataSources.length === 0) {
+            console.log("Nenhuma conexão foi detectada") 
+        } else {
+            responses.existingConnections = manifestFile.dataSources.filter(connection => connection.type.toLowerCase() === "odata")
+        }
     }
 
     const createdFileFolder = await createFolder(generatorType, webAppPath)
 
-    createFile(templatePath, createdFileFolder, responses, filePath)
+    const [generatedFiles, err] = await createFile(templatePath, createdFileFolder, responses, filePath)
+    if(err) console.log("Houve algum problema ao gerar o arquivo, tente novamente!")
+
+    // no file was generated
+    if(generatedFiles.length === 0) return process.exit()
+
+    switch(filePath){
+        case "connector-v4": {
+            const componentJs = await getComponentJs(webAppPath)
+            modifyComponentJs(webAppPath, componentJs, manifestFile)
+            break;
+        }
+    }
 }
 
-async function getManifest(webAppPath: string){
-    const manifestPath = path.join(webAppPath, "manifest.json")
-
-        // verifying existence of the requested file 
-        if(fs.existsSync(manifestPath)){
-            const manifestBuffer = await fsPromises.readFile(manifestPath)
-            const manifestFile = JSON.parse(manifestBuffer.toString()) as {[key: string]: any}
-
-            return manifestFile
-        }
-
-        return {}
+async function modifyComponentJs(webAppPath: string, componentJs: string, manifestFile: manifestSchema){
+    const projectId = manifestFile.projectId
 }
 
-async function getCreatedODataConnections(webAppPath: string){
-    const manifestFile = await getManifest(webAppPath)
-    const existingConnections: Array<{connectionName: string, connectionUri: string}>  = []
-    
-    const dataSources = manifestFile["sap.app"]?.dataSources || {}
+async function getComponentJs(webAppPath: string){
+    const componentPath = path.join(webAppPath, "Component.js")
 
-    if(!dataSources) console.log("Nenhuma conexão foi detectada") 
+    // verifying existence of the requested file 
+    if(fs.existsSync(componentPath)){
+        const componentBuffer = await fsPromises.readFile(componentPath, 'utf-8')
 
-    Object.entries(dataSources).forEach(([connectionName, connectionContent]: [string, any]) => {
-        if(!connectionContent?.uri && !connectionContent?.type) return
+        return componentBuffer.toString()
+    }
 
-        if(connectionContent?.type.toLowerCase() !== "odata") return
-
-        const connection = {
-            connectionName,
-            connectionUri: connectionContent.uri
-        }
-
-        existingConnections.push(connection)
-    })
-
-    return existingConnections
+    return ""
 }
 
 // ---------------------
