@@ -5,13 +5,11 @@ sap.ui.define([
     "use strict";
     
     return {
-
         _oPromises: {},
         _oComponent: null,
 
         init: function(oComponent) {
             this._oComponent = oComponent;
-
             <% if(existingConnections.length > 0) { %>
                 <% existingConnections.forEach(connection => { %>
                 const <%=connection.connectionName.toLowerCase().replace(/_(\w)/g, (_, letter) => letter.toUpperCase()).replace(/^./, str => str.toUpperCase())%>Model = new ODataModel("<%= connection.connectionUri %>", {

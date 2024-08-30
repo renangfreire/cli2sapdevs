@@ -15,7 +15,14 @@ async function fetchWebappFolder(){
     const CUR_DIR = process.cwd();
 
     if(CUR_DIR.includes('webapp')){
-        return CUR_DIR
+        const pathSplitted = CUR_DIR.split("\\")
+        const webAppFolderIndex = pathSplitted.indexOf("webapp")
+
+        const webAppIsLastFolder = pathSplitted.length === (webAppFolderIndex+1)        
+        if(webAppIsLastFolder) return CUR_DIR
+
+        const webappPath = pathSplitted.slice(0, webAppFolderIndex).join("\\")
+        return webappPath
     }
 
     const files = await fsPromises.readdir(CUR_DIR);
@@ -77,7 +84,7 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
     const responses = await makeQuestions(generatorType, filePath)
 
     if(responses.wantConnections){
-        responses.existingConnections = await getCreatedConnectionsInManifest(webAppPath)
+        responses.existingConnections = await getCreatedODataConnections(webAppPath)
     }
 
     const createdFileFolder = await createFolder(generatorType, webAppPath)
@@ -85,32 +92,42 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
     createFile(templatePath, createdFileFolder, responses, filePath)
 }
 
-async function getCreatedConnectionsInManifest(webAppPath: string){
+async function getManifest(webAppPath: string){
     const manifestPath = path.join(webAppPath, "manifest.json")
-    const existingConnections: Array<{connectionName: string, connectionUri: string}>  = []
 
         // verifying existence of the requested file 
         if(fs.existsSync(manifestPath)){
             const manifestBuffer = await fsPromises.readFile(manifestPath)
-            const manifestFile = JSON.parse(manifestBuffer.toString())
+            const manifestFile = JSON.parse(manifestBuffer.toString()) as {[key: string]: any}
 
-            if(!manifestFile["sap.app"].dataSources) return console.log("Nenhuma conexão foi detectada")
-
-            Object.entries(manifestFile["sap.app"].dataSources).forEach(([connectionName, connectionContent]: [string, any]) => {
-                if(!connectionContent?.uri && !connectionContent?.type) return
-
-                if(connectionContent?.type.toLowerCase() !== "odata") return
-
-                const connection = {
-                    connectionName,
-                    connectionUri: connectionContent.uri
-                }
-
-                existingConnections.push(connection)
-            })
+            return manifestFile
         }
 
-        return existingConnections
+        return {}
+}
+
+async function getCreatedODataConnections(webAppPath: string){
+    const manifestFile = await getManifest(webAppPath)
+    const existingConnections: Array<{connectionName: string, connectionUri: string}>  = []
+    
+    const dataSources = manifestFile["sap.app"]?.dataSources || {}
+
+    if(!dataSources) console.log("Nenhuma conexão foi detectada") 
+
+    Object.entries(dataSources).forEach(([connectionName, connectionContent]: [string, any]) => {
+        if(!connectionContent?.uri && !connectionContent?.type) return
+
+        if(connectionContent?.type.toLowerCase() !== "odata") return
+
+        const connection = {
+            connectionName,
+            connectionUri: connectionContent.uri
+        }
+
+        existingConnections.push(connection)
+    })
+
+    return existingConnections
 }
 
 // ---------------------
@@ -157,7 +174,7 @@ async function makeQuestions(generatorType: string, filePath: string){
           const handler = prompt[promptType] as (question: QuestionContent<typeof promptType>) => Promise<any>
         
           if(!handler) throw new Error("Prompt type not found")
-            
+
           const questionResponse = await handler(question)
   
           responses[question.name] = questionResponse
