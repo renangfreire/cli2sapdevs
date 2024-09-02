@@ -141,7 +141,8 @@ function addNewImport (projectId: string, imports: string[], fileGenerated: crea
         importsArrayToTab[importsArrayToTab.length-1] = addingCommaInLastElement
     }
 
-    const newImport = `\t\t"${projectId}/${fileGenerated.generatorType}/${fileGenerated.filename}"`
+    const filenameRemovedExtension = fileGenerated.filename.split(".").at(0)
+    const newImport = `\t\t"${projectId}/${fileGenerated.generatorType}/${filenameRemovedExtension}"`
     importsArrayToTab.push(newImport)
 
     //Add Tab on the final -> Indentation
@@ -155,19 +156,45 @@ function addNewImport (projectId: string, imports: string[], fileGenerated: crea
 async function modifyComponentJs(webAppPath: string, componentJs: string, manifestFile: manifestSchema, fileGenerated: createdFiles & {generatorType: string}){
     const projectIdWithSlash = manifestFile.projectId.replaceAll(".", "/")
 
+    // Adding new Import
     const regexDetachArrayFromComponent = /\[([\s\S]*?)\]/
     const [_, importsComponent]: string[] = componentJs.split(regexDetachArrayFromComponent)
     
     const importsArray = importsComponent.split("\r\n")
 
-    const hasConnectorImported = importsArray.some(val => val.includes(fileGenerated.filename))
+    const fileWithoutExtension = fileGenerated.filename.split(".").at(0) as string
+    const hasConnectorImported = importsArray.some(val => {
+        return val.includes(fileWithoutExtension)
+    })
 
     if(hasConnectorImported) return console.log("Connector already imported, no need import")
 
     const importsModified = addNewImport(projectIdWithSlash, importsArray, fileGenerated)
     
     const replaceOnlyArrayRegex = /\[\s*([\s\S]*?)\s*\]/;
-    const modifiedComponent = componentJs.replace(replaceOnlyArrayRegex, importsModified)
+
+    // Adding new Import
+    let modifiedComponent = componentJs.replace(replaceOnlyArrayRegex, importsModified)
+
+    // Adding new parameter in anonymous function 
+    const regexDetachFunction =  /function\s*\(([^)]*)\)\s*{/;
+
+    const [,anonymousFunctionParams] = componentJs.split(/function\s*\(([^)]*)\)\s*{/)    
+    const fileParamName = fileGenerated.filename.split(".").at(0)?.replaceAll("-", "_")
+
+    const functionWithNewImport = `function(${anonymousFunctionParams}, ${fileParamName}) {`
+
+    // Adding new param
+    modifiedComponent = modifiedComponent.replace(regexDetachFunction, functionWithNewImport)
+
+    // Adding connector.init() in init method -> Component.js
+    const regexToAddCallInInit = /(init\s*:\s*function\s*\([^)]*\)\s*{)([^]*?)(\n\s*})/
+    const [,, functionInitContent] = componentJs.split(regexToAddCallInInit)
+
+    const functionWithNewCall = `\n\t\t\t\t//Linking connector in Component\n\t\t\t\t${fileParamName}.init(this)`
+    
+    modifiedComponent = modifiedComponent.replace(regexToAddCallInInit, `$1$2 ${functionWithNewCall}$3`)
+
     fs.writeFileSync(path.join(webAppPath, "Component.js"), modifiedComponent)
 }
 
