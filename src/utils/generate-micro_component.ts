@@ -7,6 +7,7 @@ import { generatorProps } from "../@types/generator";
 import { renderEjs } from "./renderEjs";
 import { PossiblePromptTypes, QuestionContent, QuestionSchema } from "../@types/questions";
 import { adaptManifest, manifestSchema } from "../adapters/adaptManifest";
+import { connect } from "http2";
 
 type responsesSchema = {
     [key: string]: any
@@ -46,9 +47,11 @@ async function createFolder (generatorType: string, webAppPath: string){
     return fileFolder
 }
 
-async function createFile(templatePath: string, createdFileFolder: string, responses: responsesSchema, filePath: string): Promise<[{filename: string}[], boolean]>{
+
+type createdFiles = {filename: string, fileFolderPath: string}
+async function createFile(templatePath: string, createdFolderPath: string, responses: responsesSchema, filePath: string): Promise<[createdFiles[], boolean]>{
     const filesToCreate = await fsPromises.readdir(templatePath)
-    const createdFiles: {filename: string}[] = []
+    const createdFiles: createdFiles[] = []
 
     await Promise.all(
         filesToCreate.map(async (file) => {
@@ -58,13 +61,13 @@ async function createFile(templatePath: string, createdFileFolder: string, respo
     
             if(stats.isFile()){
                 // verifying existence of the requested file 
-                if(fs.existsSync(path.join(createdFileFolder, file))) {
+                if(fs.existsSync(path.join(createdFolderPath, file))) {
                     // Change FileName to FilePath => generator/* <folder name is filePath>
                     const fileExtension = file.split(".").at(-1)
                     file = `${filePath}.${fileExtension}` 
     
                     // if folder continue exists
-                    if(fs.existsSync(path.join(createdFileFolder, file))){
+                    if(fs.existsSync(path.join(createdFolderPath, file))){
                         const overwriteResponse = await prompt.confirm({
                             message: "Parece que o arquivo que deseja gerar, já existe. Deseja sobrescrevê-lo?"
                         })
@@ -76,9 +79,9 @@ async function createFile(templatePath: string, createdFileFolder: string, respo
                 const template = await fsPromises.readFile(orgFile, 'utf-8')
                 const templateEjs = renderEjs(template, responses)
                 
-                fsPromises.writeFile(path.join(createdFileFolder, file), templateEjs)
+                fsPromises.writeFile(path.join(createdFolderPath, file), templateEjs)
     
-                createdFiles.push({filename: file})
+                createdFiles.push({filename: file, fileFolderPath: createdFolderPath})
             }
         })
     )
@@ -90,21 +93,19 @@ async function createFile(templatePath: string, createdFileFolder: string, respo
 export async function generateMicroComponent({templatePath, generatorType, filePath}: generatorProps) {
     const webAppPath = await fetchWebappFolder()
 
-    const responses = await makeQuestions(generatorType, filePath)
+    const responses = await makeQuestions(generatorType, filePath) 
 
     const manifestFile = await adaptManifest(webAppPath)
 
     if(responses.wantConnections){
-        if(manifestFile.dataSources.length === 0) {
-            console.log("Nenhuma conexão foi detectada") 
-        } else {
-            responses.existingConnections = manifestFile.dataSources.filter(connection => connection.type.toLowerCase() === "odata")
-        }
+        if(manifestFile.dataSources.length === 0) console.log("Nenhuma conexão foi detectada") 
+        responses.existingConnections = manifestFile.dataSources.filter(connection => connection.type.toLowerCase() === "odata")
     }
 
-    const createdFileFolder = await createFolder(generatorType, webAppPath)
+    const createdFolderPath = await createFolder(generatorType, webAppPath)
 
-    const [generatedFiles, err] = await createFile(templatePath, createdFileFolder, responses, filePath)
+    console.log(responses)
+    const [generatedFiles, err] = await createFile(templatePath, createdFolderPath, responses, filePath)
     if(err) console.log("Houve algum problema ao gerar o arquivo, tente novamente!")
 
     // no file was generated
@@ -113,14 +114,60 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
     switch(filePath){
         case "connector-v4": {
             const componentJs = await getComponentJs(webAppPath)
-            modifyComponentJs(webAppPath, componentJs, manifestFile)
+
+            const connectorGenerated = generatedFiles.find(fileStats => fileStats.fileFolderPath.includes("connection"))
+
+            if(connectorGenerated) {
+                const connectorInfo = {
+                    ...connectorGenerated,
+                    generatorType
+                }
+
+                modifyComponentJs(webAppPath, componentJs, manifestFile, connectorInfo)
+            }
+
             break;
         }
     }
 }
 
-async function modifyComponentJs(webAppPath: string, componentJs: string, manifestFile: manifestSchema){
-    const projectId = manifestFile.projectId
+async function modifyComponentJs(webAppPath: string, componentJs: string, manifestFile: manifestSchema, connectorGenerated: createdFiles & {generatorType: string}){
+    const projectIdWithSlash = manifestFile.projectId.replaceAll(".", "/")
+
+    const regexDetachArrayFromRest = /\[([\s\S]*?)\]/
+    const [_, importsComponent]: string[] = componentJs.split(regexDetachArrayFromRest)
+    
+    const importsArray = importsComponent.split("\r\n")
+
+    const hasConnectorImported = importsArray.some(val => val.includes(connectorGenerated.filename))
+
+    if(hasConnectorImported) return console.log("Connector already imported, no need import")
+
+    // Changing Whitespace to Tab and Removing Open\close Array rested
+    const importsArrayToTab = importsArray.map(val => val.replace(/ {4}/g, "\t")).filter(val => val !== "\t" && val.trim() !== "")
+    
+    // Adding comma in last Import
+    const lastImport = importsArrayToTab.at(-1)
+
+    if(lastImport){
+        const addingCommaInLastElement = lastImport.indexOf(",", lastImport.length - 1) ? lastImport : `${lastImport},`
+        importsArrayToTab[importsArrayToTab.length-1] = addingCommaInLastElement
+    }
+
+    // Warning FIX: /CONNECTOR on the final = here it must be dynamic
+
+    const newImport = `\t\t"${projectIdWithSlash}/${connectorGenerated.generatorType}/${connectorGenerated.filename}"`
+    importsArrayToTab.push(newImport)
+
+    //Add Tab on the final -> Indentation
+    importsArrayToTab.push("\t")
+
+    const transformInExpectedString = `[\n${importsArrayToTab.join("\r\n")}]`
+
+    const replaceOnlyArrayRegex = /\[\s*([\s\S]*?)\s*\]/;
+    const modifiedComponent = componentJs.replace(replaceOnlyArrayRegex, transformInExpectedString)
+
+    fs.writeFileSync(path.join(webAppPath, "Component.js"), modifiedComponent)
 }
 
 async function getComponentJs(webAppPath: string){
