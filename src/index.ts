@@ -3,8 +3,8 @@
 import * as prompt from "@inquirer/prompts"
 import * as fs from "fs/promises";
 
-import { generateTemplate } from "./utils/generate-template";
-import { generateMicroComponent } from "./utils/generate-micro_component";
+import { generateTemplate } from "./services/generate-template";
+import { generateMicroComponent } from "./services/generate-micro_component";
 import { ExitProcessError } from "./utils/finishProcess";
 import { adaptQuestion } from "./adapters/adaptInquirerPrompt";
 

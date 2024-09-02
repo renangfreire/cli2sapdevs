@@ -4,7 +4,7 @@ import path from "path";
 
 import * as prompt from "@inquirer/prompts"
 import { generatorProps } from "../@types/generator";
-import { renderEjs } from "./renderEjs";
+import { renderEjs } from "../utils/renderEjs";
 import { PossiblePromptTypes, QuestionContent, QuestionSchema } from "../@types/questions";
 import { adaptManifest, manifestSchema } from "../adapters/adaptManifest";
 
