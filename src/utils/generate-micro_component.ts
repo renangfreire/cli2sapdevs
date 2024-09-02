@@ -7,11 +7,12 @@ import { generatorProps } from "../@types/generator";
 import { renderEjs } from "./renderEjs";
 import { PossiblePromptTypes, QuestionContent, QuestionSchema } from "../@types/questions";
 import { adaptManifest, manifestSchema } from "../adapters/adaptManifest";
-import { connect } from "http2";
 
 type responsesSchema = {
     [key: string]: any
 }
+
+type createdFiles = {filename: string, fileFolderPath: string}
 
 async function fetchWebappFolder(){
     const CUR_DIR = process.cwd();
@@ -47,8 +48,6 @@ async function createFolder (generatorType: string, webAppPath: string){
     return fileFolder
 }
 
-
-type createdFiles = {filename: string, fileFolderPath: string}
 async function createFile(templatePath: string, createdFolderPath: string, responses: responsesSchema, filePath: string): Promise<[createdFiles[], boolean]>{
     const filesToCreate = await fsPromises.readdir(templatePath)
     const createdFiles: createdFiles[] = []
@@ -156,8 +155,8 @@ function addNewImport (projectId: string, imports: string[], fileGenerated: crea
 async function modifyComponentJs(webAppPath: string, componentJs: string, manifestFile: manifestSchema, fileGenerated: createdFiles & {generatorType: string}){
     const projectIdWithSlash = manifestFile.projectId.replaceAll(".", "/")
 
-    const regexDetachArrayFromRest = /\[([\s\S]*?)\]/
-    const [_, importsComponent]: string[] = componentJs.split(regexDetachArrayFromRest)
+    const regexDetachArrayFromComponent = /\[([\s\S]*?)\]/
+    const [_, importsComponent]: string[] = componentJs.split(regexDetachArrayFromComponent)
     
     const importsArray = importsComponent.split("\r\n")
 
