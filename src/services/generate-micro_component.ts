@@ -36,6 +36,28 @@ const questions: questionStructure = {
                 }
             }
         ]
+    },
+    "controller": {
+        "BaseController": [
+            {
+                confirm: {
+                    message: "Seu projeto possui formatter?",
+                     name: "hasFormatter"
+                },
+            },
+            {
+                confirm: {
+                    message: "Seu projeto possui factories?",
+                    name: "hasFactories"
+                }
+            },
+            {
+                confirm: {
+                    message: "⚠: Deseja vincular a BaseController a TODAS as controllers do projeto?",
+                    name: "wantLinkToAllControllers"
+                }
+            }
+        ]
     }
 }
 
@@ -194,6 +216,28 @@ async function getComponentJs(webAppPath: string){
     return ""
 }
 
+async function linkBaseControllerToAll(webappPath: string, projectIdSlash: string, ){
+    const controllersPath = path.join(webappPath, "controller")
+    const allControllers = await fsPromises.readdir(controllersPath)
+
+    const ignoredFiles = ["BaseController", "App"]
+    allControllers.forEach(async file => {
+        const isFileIgnored = ignoredFiles.some(val => file.includes(val))
+        if(isFileIgnored) return
+
+        const filePath = path.join(controllersPath, file)
+        const fileStatus = fs.statSync(filePath)
+        if(!fileStatus.isFile()) return
+
+        const fileBuffer = await fsPromises.readFile(filePath, "utf-8")
+        const fileString = fileBuffer.toString()
+
+        const editedFile = fileString.replace("sap/ui/core/mvc/Controller", `${projectIdSlash}/controller/BaseController`)
+
+        fsPromises.writeFile(filePath, editedFile)
+    })
+}
+
 // Main func
 export async function generateMicroComponent({templatePath, generatorType, filePath}: generatorProps) {
     const webAppPath = await fetchWebappFolder()
@@ -202,6 +246,13 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
     const responses = await makeQuestions(selectedQuestions) 
 
     const manifestFile = await adaptManifest(webAppPath)
+
+    // Set Default data to generate files
+    const projectIdWithSlash = manifestFile.projectId.replace(".", "/")
+    
+    responses.projectId = manifestFile.projectId;
+    responses.projectIdSlash = projectIdWithSlash
+    ////////
 
     if(responses.wantConnections){
         if(manifestFile.dataSources.length === 0) console.log("Nenhuma conexão foi detectada") 
@@ -229,6 +280,13 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
                 }
 
                 modifyComponentJs(webAppPath, componentJs, manifestFile, connectorInfo)
+            }
+
+            break;
+        }
+        case "BaseController" : {
+            if(responses.wantLinkToAllControllers){
+                linkBaseControllerToAll(webAppPath, projectIdWithSlash)
             }
 
             break;

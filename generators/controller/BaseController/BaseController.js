@@ -1,17 +1,17 @@
 sap.ui.define([
     "sap/ui/core/mvc/Controller",
-    <% if(hasFormatter) {%>"<%=projectPathSlash%>/model/formatter", <% } %>
     "sap/ui/core/Fragment",
     "sap/m/MessageBox",
     "sap/m/MessageToast",
-    <% if(hasFactories) {%>"<%=projectPathSlash%>/model/factories", <% } %>
+    <% if(hasFormatter) {%>"<%=projectIdSlash%>/model/formatter", <% } %>
+    <% if(hasFactories) {%>"<%=projectIdSlash%>/model/factories" <% } %>
   ],
-    function (Controller,<%if(hasFormatter){%> formatter,<%}%>Fragment, MessageBox, MessageToast<%if(hasFormatter){%>, factories<%}%>) {
+    function (Controller, Fragment, MessageBox, MessageToast<%if(hasFormatter){%>, formatter<%}%><%if(hasFormatter){%>, factories<%}%>) {
         "use strict";
 
         const sHomeTargetName = "RouteHome";
 
-        return Controller.extend("<%=projectPath%>.controller.BaseController", {
+        const controller =  {
                 getModel: function(sNameModel){
                     return this.getView().getModel(sNameModel)
                 },
@@ -102,10 +102,18 @@ sap.ui.define([
                 },
                 _createFragment: function(sFragment){
                     return Fragment.load({
-                        name: `<%=projectPath%>.view.fragments.${sFragment}`,
+                        name: `<%=projectId%>.view.fragments.${sFragment}`,
                         id: this.getView().getId(),
                         controller: this
                       })
                 },
+        }
+
+        return Controller.extend("<%=projectId%>.controller.BaseController", {
+            ...controller,
+            MessageBox,
+            MessageToast,
+            <% if(hasFormatter){%>formatter,<%}%>
+            <%if(hasFactories){%>factories <%}%>
         })
 });
