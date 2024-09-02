@@ -104,7 +104,6 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
 
     const createdFolderPath = await createFolder(generatorType, webAppPath)
 
-    console.log(responses)
     const [generatedFiles, err] = await createFile(templatePath, createdFolderPath, responses, filePath)
     if(err) console.log("Houve algum problema ao gerar o arquivo, tente novamente!")
 
@@ -131,32 +130,19 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
     }
 }
 
-async function modifyComponentJs(webAppPath: string, componentJs: string, manifestFile: manifestSchema, connectorGenerated: createdFiles & {generatorType: string}){
-    const projectIdWithSlash = manifestFile.projectId.replaceAll(".", "/")
-
-    const regexDetachArrayFromRest = /\[([\s\S]*?)\]/
-    const [_, importsComponent]: string[] = componentJs.split(regexDetachArrayFromRest)
-    
-    const importsArray = importsComponent.split("\r\n")
-
-    const hasConnectorImported = importsArray.some(val => val.includes(connectorGenerated.filename))
-
-    if(hasConnectorImported) return console.log("Connector already imported, no need import")
-
+function addNewImport (projectId: string, imports: string[], fileGenerated: createdFiles & {generatorType: string}, ){
     // Changing Whitespace to Tab and Removing Open\close Array rested
-    const importsArrayToTab = importsArray.map(val => val.replace(/ {4}/g, "\t")).filter(val => val !== "\t" && val.trim() !== "")
+    const importsArrayToTab = imports.map(val => val.replace(/ {4}/g, "\t")).filter(val => val !== "\t" && val.trim() !== "")
     
     // Adding comma in last Import
     const lastImport = importsArrayToTab.at(-1)
 
     if(lastImport){
-        const addingCommaInLastElement = lastImport.indexOf(",", lastImport.length - 1) ? lastImport : `${lastImport},`
+        const addingCommaInLastElement = (lastImport.indexOf(",") === lastImport.length - 1) ? lastImport : `${lastImport},`
         importsArrayToTab[importsArrayToTab.length-1] = addingCommaInLastElement
     }
 
-    // Warning FIX: /CONNECTOR on the final = here it must be dynamic
-
-    const newImport = `\t\t"${projectIdWithSlash}/${connectorGenerated.generatorType}/${connectorGenerated.filename}"`
+    const newImport = `\t\t"${projectId}/${fileGenerated.generatorType}/${fileGenerated.filename}"`
     importsArrayToTab.push(newImport)
 
     //Add Tab on the final -> Indentation
@@ -164,9 +150,25 @@ async function modifyComponentJs(webAppPath: string, componentJs: string, manife
 
     const transformInExpectedString = `[\n${importsArrayToTab.join("\r\n")}]`
 
-    const replaceOnlyArrayRegex = /\[\s*([\s\S]*?)\s*\]/;
-    const modifiedComponent = componentJs.replace(replaceOnlyArrayRegex, transformInExpectedString)
+    return transformInExpectedString
+}
 
+async function modifyComponentJs(webAppPath: string, componentJs: string, manifestFile: manifestSchema, fileGenerated: createdFiles & {generatorType: string}){
+    const projectIdWithSlash = manifestFile.projectId.replaceAll(".", "/")
+
+    const regexDetachArrayFromRest = /\[([\s\S]*?)\]/
+    const [_, importsComponent]: string[] = componentJs.split(regexDetachArrayFromRest)
+    
+    const importsArray = importsComponent.split("\r\n")
+
+    const hasConnectorImported = importsArray.some(val => val.includes(fileGenerated.filename))
+
+    if(hasConnectorImported) return console.log("Connector already imported, no need import")
+
+    const importsModified = addNewImport(projectIdWithSlash, importsArray, fileGenerated)
+    
+    const replaceOnlyArrayRegex = /\[\s*([\s\S]*?)\s*\]/;
+    const modifiedComponent = componentJs.replace(replaceOnlyArrayRegex, importsModified)
     fs.writeFileSync(path.join(webAppPath, "Component.js"), modifiedComponent)
 }
 
