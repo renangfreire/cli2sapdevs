@@ -3,7 +3,6 @@ import { ExtractMethodNames } from "../utils/ts-utils";
 
 type PossiblePromptTypes = ExtractMethodNames<typeof prompt>
 type QuestionContent<T extends keyof QuestionSchema> = QuestionSchema[T];
-
 interface BaseQuestionSchema {
   name: string
 }

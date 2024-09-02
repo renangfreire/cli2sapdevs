@@ -1,18 +1,43 @@
 import * as fsPromises from "fs/promises"
 import * as fs from "fs"
 import path from "path";
-
 import * as prompt from "@inquirer/prompts"
+
 import { generatorProps } from "../@types/generator";
 import { renderEjs } from "../utils/renderEjs";
-import { PossiblePromptTypes, QuestionContent, QuestionSchema } from "../@types/questions";
 import { adaptManifest, manifestSchema } from "../adapters/adaptManifest";
+import { makeQuestions, responsesSchema } from "../utils/makeQuestions";
+import { QuestionSchema } from "../@types/questions";
 
-type responsesSchema = {
-    [key: string]: any
-}
 
 type createdFiles = {filename: string, fileFolderPath: string}
+
+type questionStructure = {
+    [key: string]: {
+        [anotherKey: string]: QuestionSchema[]
+    }
+}
+
+const questions: questionStructure = {
+    "connection": {
+        "connector-v4": [
+            {
+                confirm: {
+                    message: "Deseja que o arquivo contenha a documentação?",
+                    name: "wantDocs",
+                }
+            }
+        ],
+        "connector-v2": [
+            {
+                confirm: {
+                    message: "Deseja vincular a connector as models existentes?",
+                    name: "wantConnections",
+                }
+            }
+        ]
+    }
+}
 
 async function fetchWebappFolder(){
     const CUR_DIR = process.cwd();
@@ -86,47 +111,6 @@ async function createFile(templatePath: string, createdFolderPath: string, respo
     )
 
     return [createdFiles, false]
-}
-
-// Main func
-export async function generateMicroComponent({templatePath, generatorType, filePath}: generatorProps) {
-    const webAppPath = await fetchWebappFolder()
-
-    const responses = await makeQuestions(generatorType, filePath) 
-
-    const manifestFile = await adaptManifest(webAppPath)
-
-    if(responses.wantConnections){
-        if(manifestFile.dataSources.length === 0) console.log("Nenhuma conexão foi detectada") 
-        responses.existingConnections = manifestFile.dataSources.filter(connection => connection.type.toLowerCase() === "odata")
-    }
-
-    const createdFolderPath = await createFolder(generatorType, webAppPath)
-
-    const [generatedFiles, err] = await createFile(templatePath, createdFolderPath, responses, filePath)
-    if(err) console.log("Houve algum problema ao gerar o arquivo, tente novamente!")
-
-    // no file was generated
-    if(generatedFiles.length === 0) return process.exit()
-
-    switch(filePath){
-        case "connector-v4": {
-            const componentJs = await getComponentJs(webAppPath)
-
-            const connectorGenerated = generatedFiles.find(fileStats => fileStats.fileFolderPath.includes("connection"))
-
-            if(connectorGenerated) {
-                const connectorInfo = {
-                    ...connectorGenerated,
-                    generatorType
-                }
-
-                modifyComponentJs(webAppPath, componentJs, manifestFile, connectorInfo)
-            }
-
-            break;
-        }
-    }
 }
 
 function addNewImport (projectId: string, imports: string[], fileGenerated: createdFiles & {generatorType: string}, ){
@@ -210,55 +194,44 @@ async function getComponentJs(webAppPath: string){
     return ""
 }
 
-// ---------------------
+// Main func
+export async function generateMicroComponent({templatePath, generatorType, filePath}: generatorProps) {
+    const webAppPath = await fetchWebappFolder()
 
-// below ONLY funcs to WORK with PROMPTS
-type questionStructure = {
-    [key: string]: {
-        [anotherKey: string]: QuestionSchema[]
-    }
-}
-
-const questions: questionStructure = {
-    "connection": {
-        "connector-v4": [
-            {
-                confirm: {
-                    message: "Deseja que o arquivo contenha a documentação?",
-                    name: "wantDocs",
-                }
-            }
-        ],
-        "connector-v2": [
-            {
-                confirm: {
-                    message: "Deseja vincular a connector as models existentes?",
-                    name: "wantConnections",
-                }
-            }
-        ]
-    }
-}
-
-async function makeQuestions(generatorType: string, filePath: string){
     const selectedQuestions = questions[generatorType][filePath]
-    const responses: responsesSchema = {}
+    const responses = await makeQuestions(selectedQuestions) 
 
-      for await (const questionData of selectedQuestions) {
-          const [promptType, question] = Object.entries(questionData).at(0) as [PossiblePromptTypes, QuestionContent<PossiblePromptTypes>]
+    const manifestFile = await adaptManifest(webAppPath)
 
-          if(question === undefined) throw new Error("Error in Question Structure")
+    if(responses.wantConnections){
+        if(manifestFile.dataSources.length === 0) console.log("Nenhuma conexão foi detectada") 
+        responses.existingConnections = manifestFile.dataSources.filter(connection => connection.type.toLowerCase() === "odata")
+    }
 
-          if(!promptType) throw new Error("Necessary prompt type in Question Schema")
-        
-          const handler = prompt[promptType] as (question: QuestionContent<typeof promptType>) => Promise<any>
-        
-          if(!handler) throw new Error("Prompt type not found")
+    const createdFolderPath = await createFolder(generatorType, webAppPath)
 
-          const questionResponse = await handler(question)
-  
-          responses[question.name] = questionResponse
-      }
-    
-      return responses
+    const [generatedFiles, err] = await createFile(templatePath, createdFolderPath, responses, filePath)
+    if(err) console.log("Houve algum problema ao gerar o arquivo, tente novamente!")
+
+    // no file was generated
+    if(generatedFiles.length === 0) return process.exit()
+
+    switch(filePath){
+        case "connector-v4": {
+            const componentJs = await getComponentJs(webAppPath)
+
+            const connectorGenerated = generatedFiles.find(fileStats => fileStats.fileFolderPath.includes("connection"))
+
+            if(connectorGenerated) {
+                const connectorInfo = {
+                    ...connectorGenerated,
+                    generatorType
+                }
+
+                modifyComponentJs(webAppPath, componentJs, manifestFile, connectorInfo)
+            }
+
+            break;
+        }
+    }
 }
