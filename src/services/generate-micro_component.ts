@@ -189,7 +189,6 @@ async function modifyComponentJs(webAppPath: string, componentJs: string, manife
 
     // Adding connector.init() in init method -> Component.js
     const regexToAddCallInInit = /(init\s*:\s*function\s*\([^)]*\)\s*{)([^]*?)(\n\s*})/
-    const [,, functionInitContent] = componentJs.split(regexToAddCallInInit)
 
     const functionWithNewCall = `\n\t\t\t\t//Linking connector in Component\n\t\t\t\t${fileParamName}.init(this)`
     
