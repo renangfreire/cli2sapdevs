@@ -1,5 +1,5 @@
 import * as prompt from "@inquirer/prompts"
-import { ExtractMethodNames } from "../utils/ts-utils";
+import { ExtractMethodNames } from "./ts-utils";
 
 type PossiblePromptTypes = ExtractMethodNames<typeof prompt>
 type QuestionContent<T extends keyof QuestionSchema> = QuestionSchema[T];

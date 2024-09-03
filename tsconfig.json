@@ -27,7 +27,6 @@
     "exclude": [
       "node_modules",
       "dist",
-      "generators/connection/connector-v2/connector.js"
     ]
   }
   

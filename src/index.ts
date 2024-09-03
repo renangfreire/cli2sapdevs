@@ -65,6 +65,8 @@ switch(generatorTypeResponse.data){
   case "template":
     generateTemplate(generatorData)
     break;
+  case "utils":
+    break;
   default:
     generateMicroComponent(generatorData)
 }

@@ -1,16 +1,13 @@
 import * as fsPromises from "fs/promises"
 import * as fs from "fs"
 import path from "path";
-import * as prompt from "@inquirer/prompts"
 
 import { generatorProps } from "../@types/generator";
-import { renderEjs } from "../utils/renderEjs";
 import { adaptManifest, manifestSchema } from "../adapters/adaptManifest";
-import { makeQuestions, responsesSchema } from "../utils/makeQuestions";
+import { makeQuestions } from "../utils/makeQuestions";
 import { QuestionSchema } from "../@types/questions";
-
-
-type createdFiles = {filename: string, fileFolderPath: string}
+import { getFile } from "../helpers/getFile";
+import { createdFiles, createFile } from "../helpers/createFile";
 
 type questionStructure = {
     [key: string]: {
@@ -95,46 +92,6 @@ async function createFolder (generatorType: string, webAppPath: string){
     return fileFolder
 }
 
-async function createFile(templatePath: string, createdFolderPath: string, responses: responsesSchema, filePath: string): Promise<[createdFiles[], boolean]>{
-    const filesToCreate = await fsPromises.readdir(templatePath)
-    const createdFiles: createdFiles[] = []
-
-    await Promise.all(
-        filesToCreate.map(async (file) => {
-            const orgFile = path.join(templatePath, file)
-    
-            const stats = fs.statSync(orgFile)
-    
-            if(stats.isFile()){
-                // verifying existence of the requested file 
-                if(fs.existsSync(path.join(createdFolderPath, file))) {
-                    // Change FileName to FilePath => generator/* <folder name is filePath>
-                    const fileExtension = file.split(".").at(-1)
-                    file = `${filePath}.${fileExtension}` 
-    
-                    // if folder continue exists
-                    if(fs.existsSync(path.join(createdFolderPath, file))){
-                        const overwriteResponse = await prompt.confirm({
-                            message: "Parece que o arquivo que deseja gerar, já existe. Deseja sobrescrevê-lo?"
-                        })
-    
-                        if(!overwriteResponse) return
-                    }
-                }
-    
-                const template = await fsPromises.readFile(orgFile, 'utf-8')
-                const templateEjs = renderEjs(template, responses)
-                
-                fsPromises.writeFile(path.join(createdFolderPath, file), templateEjs)
-    
-                createdFiles.push({filename: file, fileFolderPath: createdFolderPath})
-            }
-        })
-    )
-
-    return [createdFiles, false]
-}
-
 function addNewImport (projectId: string, imports: string[], fileGenerated: createdFiles & {generatorType: string}, ){
     // Changing Whitespace to Tab and Removing Open\close Array rested
     const importsArrayToTab = imports.map(val => val.replace(/ {4}/g, "\t")).filter(val => val !== "\t" && val.trim() !== "")
@@ -203,19 +160,6 @@ async function modifyComponentJs(webAppPath: string, componentJs: string, manife
     fs.writeFileSync(path.join(webAppPath, "Component.js"), modifiedComponent)
 }
 
-async function getComponentJs(webAppPath: string){
-    const componentPath = path.join(webAppPath, "Component.js")
-
-    // verifying existence of the requested file 
-    if(fs.existsSync(componentPath)){
-        const componentBuffer = await fsPromises.readFile(componentPath, 'utf-8')
-
-        return componentBuffer.toString()
-    }
-
-    return ""
-}
-
 async function linkBaseControllerToAll(webappPath: string, projectIdSlash: string, ){
     const controllersPath = path.join(webappPath, "controller")
     const allControllers = await fsPromises.readdir(controllersPath)
@@ -261,7 +205,13 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
 
     const createdFolderPath = await createFolder(generatorType, webAppPath)
 
-    const [generatedFiles, err] = await createFile(templatePath, createdFolderPath, responses, filePath)
+    const [generatedFiles, err] = await createFile({
+        templatePath, 
+        destinationFolderPath: createdFolderPath, 
+        filePath,
+        responses
+    })
+
     if(err) console.log("Houve algum problema ao gerar o arquivo, tente novamente!")
 
     // no file was generated
@@ -269,7 +219,10 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
 
     switch(filePath){
         case "connector-v4": {
-            const componentJs = await getComponentJs(webAppPath)
+            const [componentJs, err] = await getFile(webAppPath, "Component.js")
+            if(err){
+                return console.log("Component.js not found in project")
+            }
 
             const connectorGenerated = generatedFiles.find(fileStats => fileStats.fileFolderPath.includes("connection"))
 

@@ -1,7 +1,5 @@
-import * as fs from "fs"
-import * as fsPromises from "fs/promises"
-import path from "path"
 import { ExitProcessError } from "../utils/finishProcess"
+import { getFile } from "../helpers/getFile"
 
 interface manifestSchemaEntry {
     [key: string]: any
@@ -31,25 +29,12 @@ export interface manifestSchema {
     dataSources: dataSourceReturn[],
 }
 
-async function getManifest(webAppPath: string): Promise<[manifestSchemaEntry, boolean]>{
-    const manifestPath = path.join(webAppPath, "manifest.json")
-
-    // verifying existence of the requested file 
-    if(fs.existsSync(manifestPath)){
-        const manifestBuffer = await fsPromises.readFile(manifestPath)
-        const manifestFile = JSON.parse(manifestBuffer.toString()) as {[key: string]: any}
-
-        return [manifestFile, false]
-    }
-
-    return [{}, true]
-}
-
 export async function adaptManifest(webAppPath: string): Promise<manifestSchema>{
-    const [manifestFile, err] = await getManifest(webAppPath)
+    const [manifestFile, err] = await getFile(webAppPath, "manifest.json")
+    const manifestJson: manifestSchemaEntry = JSON.parse(manifestFile)
     if(err) ExitProcessError("Manifest.json not founded in your project path, try change prompt path")
 
-    const sapApp = manifestFile["sap.app"]
+    const sapApp = manifestJson["sap.app"]
 
     const dataSources = adaptDataSources(sapApp["dataSources"])
     
