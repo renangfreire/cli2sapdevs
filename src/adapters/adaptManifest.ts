@@ -3,7 +3,7 @@ import { getFile } from "../helpers/getFile"
 
 interface manifestSchemaEntry {
     [key: string]: any
-};
+}
 
 type dataSourceEntry = {
     [key: string]: {

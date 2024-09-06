@@ -1,13 +1,13 @@
 import * as fsPromises from "fs/promises"
 import * as fs from "fs"
-import path from "path";
+import path from "path"
 
-import { generatorProps } from "../@types/generator";
-import { adaptManifest, manifestSchema } from "../adapters/adaptManifest";
-import { makeQuestions } from "../utils/makeQuestions";
-import { QuestionSchema } from "../@types/questions";
-import { getFile } from "../helpers/getFile";
-import { createdFiles, createFile } from "../helpers/createFile";
+import { generatorProps } from "../@types/generator"
+import { adaptManifest, manifestSchema } from "../adapters/adaptManifest"
+import { makeQuestions } from "../utils/makeQuestions"
+import { QuestionSchema } from "../@types/questions"
+import { getFile } from "../helpers/getFile"
+import { createdFiles, createFile } from "../helpers/createFile"
 
 type questionStructure = {
     [key: string]: {
@@ -59,9 +59,9 @@ const questions: questionStructure = {
 }
 
 async function fetchWebappFolder(){
-    const CUR_DIR = process.cwd();
+    const CUR_DIR = process.cwd()
 
-    if(CUR_DIR.includes('webapp')){
+    if(CUR_DIR.includes("webapp")){
         const pathSplitted = CUR_DIR.split("\\")
         const webAppFolderIndex = pathSplitted.indexOf("webapp")
 
@@ -72,11 +72,11 @@ async function fetchWebappFolder(){
         return webappPath
     }
 
-    const files = await fsPromises.readdir(CUR_DIR);
-    const webappFolder = files.find((file) => file === 'webapp');
+    const files = await fsPromises.readdir(CUR_DIR)
+    const webappFolder = files.find((file) => file === "webapp")
     if (!webappFolder) {
-        console.log('It must be running inside a UI5 app that contains a webapp');
-        process.exit();
+        console.log("It must be running inside a UI5 app that contains a webapp")
+        process.exit()
     }
     
     return path.join(CUR_DIR, webappFolder)
@@ -94,7 +94,7 @@ async function createFolder (generatorType: string, webAppPath: string){
 
 function addNewImport (projectId: string, imports: string[], fileGenerated: createdFiles & {generatorType: string}, ){
     // Changing Whitespace to Tab and Removing Open\close Array rested
-    const importsArrayToTab = imports.map(val => val.replace(/ {4}/g, "\t")).filter(val => val !== "\t" && val.trim() !== "")
+    const importsArrayToTab = imports.map((val) => val.replace(/ {4}/g, "\t")).filter((val) => val !== "\t" && val.trim() !== "")
     
     // Adding comma in last Import
     const lastImport = importsArrayToTab.at(-1)
@@ -126,7 +126,7 @@ async function modifyComponentJs(webAppPath: string, componentJs: string, manife
     const importsArray = importsComponent.split("\r\n")
 
     const fileWithoutExtension = fileGenerated.filename.split(".").at(0) as string
-    const hasConnectorImported = importsArray.some(val => {
+    const hasConnectorImported = importsArray.some((val) => {
         return val.includes(fileWithoutExtension)
     })
 
@@ -134,13 +134,13 @@ async function modifyComponentJs(webAppPath: string, componentJs: string, manife
 
     const importsModified = addNewImport(projectIdWithSlash, importsArray, fileGenerated)
     
-    const replaceOnlyArrayRegex = /\[\s*([\s\S]*?)\s*\]/;
+    const replaceOnlyArrayRegex = /\[\s*([\s\S]*?)\s*\]/
 
     // Adding new Import
     let modifiedComponent = componentJs.replace(replaceOnlyArrayRegex, importsModified)
 
     // Adding new parameter in anonymous function 
-    const regexDetachFunction =  /function\s*\(([^)]*)\)\s*{/;
+    const regexDetachFunction =  /function\s*\(([^)]*)\)\s*{/
 
     const [,anonymousFunctionParams] = componentJs.split(/function\s*\(([^)]*)\)\s*{/)    
     const fileParamName = fileGenerated.filename.split(".").at(0)?.replaceAll("-", "_")
@@ -165,8 +165,8 @@ async function linkBaseControllerToAll(webappPath: string, projectIdSlash: strin
     const allControllers = await fsPromises.readdir(controllersPath)
 
     const ignoredFiles = ["BaseController", "App"]
-    allControllers.forEach(async file => {
-        const isFileIgnored = ignoredFiles.some(val => file.includes(val))
+    allControllers.forEach(async (file) => {
+        const isFileIgnored = ignoredFiles.some((val) => file.includes(val))
         if(isFileIgnored) return
 
         const filePath = path.join(controllersPath, file)
@@ -194,13 +194,13 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
     // Set Default data to generate files
     const projectIdWithSlash = manifestFile.projectId.replace(".", "/")
     
-    responses.projectId = manifestFile.projectId;
+    responses.projectId = manifestFile.projectId
     responses.projectIdSlash = projectIdWithSlash
     ////////
 
     if(responses.wantConnections){
         if(manifestFile.dataSources.length === 0) console.log("Nenhuma conexão foi detectada") 
-        responses.existingConnections = manifestFile.dataSources.filter(connection => connection.type.toLowerCase() === "odata")
+        responses.existingConnections = manifestFile.dataSources.filter((connection) => connection.type.toLowerCase() === "odata")
     }
 
     const createdFolderPath = await createFolder(generatorType, webAppPath)
@@ -224,7 +224,7 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
                 return console.log("Component.js not found in project")
             }
 
-            const connectorGenerated = generatedFiles.find(fileStats => fileStats.fileFolderPath.includes("connection"))
+            const connectorGenerated = generatedFiles.find((fileStats) => fileStats.fileFolderPath.includes("connection"))
 
             if(connectorGenerated) {
                 const connectorInfo = {
@@ -235,14 +235,14 @@ export async function generateMicroComponent({templatePath, generatorType, fileP
                 modifyComponentJs(webAppPath, componentJs, manifestFile, connectorInfo)
             }
 
-            break;
+            break
         }
         case "BaseController" : {
             if(responses.wantLinkToAllControllers){
                 linkBaseControllerToAll(webAppPath, projectIdWithSlash)
             }
 
-            break;
+            break
         }
     }
 }

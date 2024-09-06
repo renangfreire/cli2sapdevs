@@ -7,7 +7,8 @@
   "scripts": {
     "start:dev": "tsx ./src/index.ts",
     "build": "tsup ./src/index.ts --format esm && shx rm -rf dist/generators && shx cp -r generators dist",
-    "build:link": "npm unlink cli2sapdevs && npm run build && npm link"
+    "build:link": "npm unlink cli2sapdevs && npm run build && npm link",
+    "lint": "eslint . --fix"
   },
   "type": "module",
   "keywords": [],
@@ -16,6 +17,9 @@
   "devDependencies": {
     "@types/ejs": "^3.1.5",
     "@types/node": "^22.5.0",
+    "@typescript-eslint/eslint-plugin": "^8.4.0",
+    "@typescript-eslint/parser": "^8.4.0",
+    "eslint": "^8.57.0",
     "shx": "^0.3.4",
     "tsup": "^8.2.4",
     "tsx": "^4.18.0",
