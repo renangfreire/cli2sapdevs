@@ -5,7 +5,7 @@ import { ExitProcessError } from "../utils/finishProcess"
 
 interface manifestSchemaEntry {
     [key: string]: any
-};
+}
 
 type dataSourceEntry = {
     [key: string]: {
